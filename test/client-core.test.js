@@ -38,6 +38,12 @@ function loadCore(windowOverrides = {}) {
 
 const core = loadCore();
 
+test("API paths follow a path-prefixed Web deployment", () => {
+	assert.equal(core.resolveAppPath("/prompt-manager/library", "http://127.0.0.1:3080/?token=x"), "/prompt-manager/library");
+	assert.equal(core.resolveAppPath("/prompt-manager/library", "https://example.com/dsh/?token=x"), "/dsh/prompt-manager/library");
+	assert.equal(core.resolveAppPath("/prompt-manager/session?sessionId=abc", "https://example.com/dsh"), "/dsh/prompt-manager/session?sessionId=abc");
+});
+
 test("prompt picker stays inside narrow viewports", () => {
 	assert.equal(core.pickerLeftOffset(80, 320, 600), 0);
 	assert.equal(core.pickerLeftOffset(200, 316, 340), -188);

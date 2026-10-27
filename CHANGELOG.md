@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 - 2026-10-27
+
+- Aligned with DSH 0.2.1-rc.3: declared `engines.dsh` and `dsh.manifestVersion` so the plugin manager can evaluate compatibility, and verified the Host routes, settings page, composer picker, and per-session injection against the new release.
+- Used DSH 0.2.1's literal prompt sections (`interpolate: false`) so `{{placeholders}}` reach the model exactly as written. Older DSH releases still receive the brace-escaping fallback.
+- Resolved the plugin's API paths against the document directory so they keep working when DSH is published under a reverse-proxy path prefix (`--public-url https://host/dsh/`).
+- Kept prompt reads and mutations local-only on DSH 0.2.x public deployments by also requiring a loopback `Host` authority; `DSH_PROMPT_MANAGER_ALLOW_REMOTE=1` remains the explicit opt-out.
+
 ## 1.5.2 - 2026-09-27
 
 - Improved contrast in DSH 0.1.7-rc.2: search and form placeholders no longer use the barely visible dimmed label color.

@@ -11,12 +11,14 @@ import {
   assertMutationRequest,
   escapePromptVariables,
   isLoopbackAddress,
+  isLoopbackHost,
   normalizeActivation,
   normalizeLibraryPrompts,
   normalizeStoredPrompts,
   renderInjectedPrompt,
   resolveActivePrompt,
-  resolveActivePrompts
+  resolveActivePrompts,
+  supportsLiteralPromptSections
 } from "../lib/index.js";
 
 function mutationRequest(address = "127.0.0.1", headers = {}) {
@@ -33,9 +35,19 @@ test("loopback detection accepts IPv4 and IPv6 local clients", () => {
   assert.equal(isLoopbackAddress("192.168.1.12"), false);
 });
 
+test("local host detection accepts loopback Host authorities only", () => {
+  assert.equal(isLoopbackHost("127.0.0.1:3080"), true);
+  assert.equal(isLoopbackHost("localhost:3080"), true);
+  assert.equal(isLoopbackHost("[::1]:3080"), true);
+  assert.equal(isLoopbackHost("example.com"), false);
+  assert.equal(isLoopbackHost("127.0.0.1.nip.io:3080"), false);
+  assert.equal(isLoopbackHost(""), false);
+});
+
 test("mutation requests are JSON, same-origin, and loopback by default", () => {
   assert.doesNotThrow(() => assertMutationRequest(mutationRequest()));
   assert.throws(() => assertMutationRequest(mutationRequest("192.168.1.12")), /remote prompt mutation is disabled/);
+  assert.throws(() => assertMutationRequest(mutationRequest("127.0.0.1", { host: "example.com" })), /loopback host/);
   assert.throws(() => assertMutationRequest(mutationRequest("127.0.0.1", { "content-type": "text/plain" })), /application\/json/);
   assert.throws(() => assertMutationRequest(mutationRequest("127.0.0.1", { origin: "http://example.com" })), /origin does not match/);
 });
@@ -43,6 +55,7 @@ test("mutation requests are JSON, same-origin, and loopback by default", () => {
 test("library reads are loopback and same-origin by default", () => {
 	assert.doesNotThrow(() => assertLocalReadRequest(mutationRequest()));
 	assert.throws(() => assertLocalReadRequest(mutationRequest("192.168.1.12")), /remote prompt reads are disabled/);
+	assert.throws(() => assertLocalReadRequest(mutationRequest("127.0.0.1", { host: "example.com" })), /loopback host/);
 	assert.throws(() => assertLocalReadRequest(mutationRequest("127.0.0.1", { origin: "http://example.com" })), /origin does not match/);
 });
 
@@ -59,6 +72,19 @@ test("activation input is normalized without retaining extra fields", () => {
 
 test("user placeholder braces cannot become DSH system prompt variables", () => {
   assert.equal(escapePromptVariables("Use {{code}} and {{ framework }}"), "Use { {code} } and { { framework } }");
+});
+
+test("DSH 0.2.1 literal sections preserve placeholder braces exactly", () => {
+  const active = new Map([["session-1", { prompts: [{ id: "review", title: "Code review", content: "Review {{code}}" }] }]]);
+  const value = renderInjectedPrompt(active, { agent: { session: { header: { id: "session-1" } } } }, undefined, { literal: true });
+  assert.match(value, /Review \{\{code\}\}/);
+  assert.doesNotMatch(value, /Review \{ \{code\} \}/);
+});
+
+test("literal prompt sections are detected from the DSH 0.2.1 service", () => {
+  assert.equal(supportsLiteralPromptSections(undefined), false);
+  assert.equal(supportsLiteralPromptSections({}), false);
+  assert.equal(supportsLiteralPromptSections({ refreshContext() {} }), true);
 });
 
 test("injected prompts are isolated to the addressed session", () => {
@@ -95,6 +121,22 @@ test("forked sessions inherit the nearest prompt set and can override it locally
   active.set("child", null);
   assert.equal(resolveActivePrompt(active, sessions, "grandchild"), null);
   assert.equal(renderInjectedPrompt(active, { agent: { session: { header: { id: "grandchild" } } } }, sessions), "");
+});
+
+test("the system prompt section opts into literal text on DSH 0.2.1", () => {
+	let section;
+	const ctx = {
+		sessions: new Map(),
+		emit() {},
+		effect(setup) { return setup(); },
+		systemPrompt: {
+			refreshContext(assembly) { return assembly; },
+			section(options) { section = options; return () => {}; }
+		},
+		webServer: { register() { return () => {}; } }
+	};
+	apply(ctx);
+	assert.equal(section.interpolate, false);
 });
 
 test("stored prompt sets accept legacy single records and deduplicate ordered collections", () => {

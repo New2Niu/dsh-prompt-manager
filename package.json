@@ -1,6 +1,6 @@
 {
   "name": "dsh-prompt-manager",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "A local, bilingual prompt library with session-level system prompt injection for DeepSeek Harness Web.",
   "private": false,
   "type": "module",
@@ -24,7 +24,8 @@
     "prompt-library"
   ],
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.1.7-rc.2 <0.3.0-0"
   },
   "scripts": {
     "check": "node --check lib/index.js && node --check lib/client.js",
@@ -53,6 +54,7 @@
     "LICENSE"
   ],
   "dsh": {
+    "manifestVersion": 1,
     "client": {
       "platform": "web",
       "immediately": true

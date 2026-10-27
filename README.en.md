@@ -29,6 +29,10 @@ Search and select the prompts used by the current session directly from the comp
 
 Four editable examples are included on first use.
 
+## Compatibility
+
+Supports DSH `0.1.7-rc.2` through `0.2.x` and is verified on DSH `0.2.1-rc.3`. DSH `0.2.1` and newer keep `{{placeholders}}` literal; earlier releases fall back to brace escaping automatically.
+
 ## Install
 
 The recommended installation uses DSH's plugin command and the npm package:
