@@ -20,7 +20,7 @@ Search and select the prompts used by the current session directly from the comp
 
 - Create, edit, delete, and search prompts from **Settings → Prompt Manager**.
 - Favorite the useful ones; ordering also learns from use count and recency.
-- Open the prompt list with `/prompt` or `/提示词`, or search directly with `/keyword`.
+- Open the prompt list with `/prompt` or `/提示词`, or search directly with `/keyword`. Aliases accept abbreviations: `/pro` and `/prom` work like `/prompt`, and `/提示` works like `/提示词`.
 - Use the **Prompts** control inside the composer tool row. Its compact menu opens against the control and lets you search, select multiple prompts, or remove them independently.
 - Once active, the control shows the prompt name. Branches created from that session inherit the prompt and show the same state.
 - Export the library as a JSON backup, then import it by merging or replacing.
@@ -57,7 +57,7 @@ The script copies the plugin to `$DSH_HOME/local-plugins/dsh-prompt-manager`, ad
 2. Choose **New**, then add a title, tags, and the prompt body. `{{placeholders}}` remain literal text and cannot be mistaken for DSH's internal variables.
 3. Return to the chat box and click **Prompts** beside the access-mode control, then search for and select one or more prompts.
 4. The control now shows the active prompt name or count. Open it again to add more or remove prompts independently. They apply as system instructions and are not posted as chat messages.
-5. You can also type `/prompt`, `/提示词`, or `/keyword` for quick selection. The slash token disappears after a pick.
+5. You can also type `/prompt`, `/提示词` (short forms such as `/pro` and `/提示` work too), or `/keyword` for quick selection. The slash token disappears after a pick.
 
 Use `Ctrl + Enter` (`⌘ + Enter` on macOS) to save while editing.
 

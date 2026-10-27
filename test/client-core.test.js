@@ -73,6 +73,20 @@ test("slash aliases are removed before prompt search", () => {
   assert.equal(core.stripPromptAlias("promptly"), "promptly");
 });
 
+test("slash aliases accept abbreviations", () => {
+  assert.equal(core.stripPromptAlias("pro"), "");
+  assert.equal(core.stripPromptAlias("prom"), "");
+  assert.equal(core.stripPromptAlias("Prom release"), "release");
+  assert.equal(core.stripPromptAlias("pr 代码"), "代码");
+  assert.equal(core.stripPromptAlias("提示"), "");
+  assert.equal(core.stripPromptAlias("提示 代码"), "代码");
+  // A single letter and lookalike prefixes stay ordinary search text.
+  assert.equal(core.stripPromptAlias("p"), "p");
+  assert.equal(core.stripPromptAlias("提示词法"), "提示词法");
+  // A leading space is an escape hatch for searching the alias itself.
+  assert.equal(core.stripPromptAlias(" pro"), "pro");
+});
+
 test("normalizeTags trims, deduplicates, and caps tag length", () => {
   assert.deepEqual(Array.from(core.normalizeTags(" Dev, dev， Test ;  ")), ["Dev", "Test"]);
   assert.equal(core.normalizeTags(["x".repeat(80)])[0].length, 40);

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The `/prompt` and `/提示词` slash commands now accept abbreviations: any two-or-more-character prefix (`/pr`, `/pro`, `/prom`, `/提示`) opens the full prompt list just like the full alias. Single letters and lookalikes such as `/promptly` still search normally, and a leading space (`/ pro`) searches the alias text itself.
+
 ## 1.6.0 - 2026-10-27
 
 - Aligned with DSH 0.2.1-rc.3: declared `engines.dsh` and `dsh.manifestVersion` so the plugin manager can evaluate compatibility, and verified the Host routes, settings page, composer picker, and per-session injection against the new release.
