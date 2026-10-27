@@ -44,6 +44,13 @@ test("prompt picker stays inside narrow viewports", () => {
 	assert.equal(core.pickerLeftOffset(4, 200, 400), 8);
 });
 
+test("settings navigation label matching ignores surrounding whitespace", () => {
+	assert.equal(core.settingsNavLabelMatches("  提示词管理 \n", "提示词管理"), true);
+	assert.equal(core.settingsNavLabelMatches("Prompt   Manager", "Prompt Manager"), true);
+	assert.equal(core.settingsNavLabelMatches("Prompt Manager", "提示词管理"), false);
+	assert.equal(core.settingsNavLabelMatches(null, "提示词管理"), false);
+});
+
 test("Chinese and English dictionaries stay in sync", () => {
   assert.deepEqual(Object.keys(core.messages.zh).sort(), Object.keys(core.messages.en).sort());
 });
