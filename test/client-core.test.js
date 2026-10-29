@@ -106,6 +106,25 @@ test("sanitization rejects malformed entries without breaking valid prompts", ()
   assert.equal(result.skipped, 3);
 });
 
+test("hidden prompts stay in the library but leave the composer lists", () => {
+  const cleaned = core.sanitizePrompts([
+    { id: "shown", title: "Shown", content: "one" },
+    { id: "hidden", title: "Hidden", content: "two", hidden: true }
+  ]).prompts;
+  assert.equal(cleaned.length, 2);
+  assert.equal(cleaned[0].hidden, false);
+  assert.equal(cleaned[1].hidden, true);
+  assert.deepEqual(Array.from(core.visiblePrompts(cleaned), (prompt) => prompt.id), ["shown"]);
+});
+
+test("a hidden prompt survives the export/import round trip", () => {
+  const imported = core.parseImportText(core.exportDocument([
+    { id: "one", title: "A", content: "B", hidden: true }
+  ]));
+  assert.equal(imported.ok, true);
+  assert.equal(imported.prompts[0].hidden, true);
+});
+
 test("exported backups round-trip through the importer", () => {
   const source = [{ id: "one", title: "Review", content: "Check it", tags: ["dev"], favorite: true }];
   const imported = core.parseImportText(core.exportDocument(source));
@@ -415,4 +434,141 @@ test("concurrent edits in two tabs converge without a storage-event write loop",
 		assert.equal(tab.storeSnapshot().dirty, false);
 		assert.equal(tab.storeSnapshot().syncError, "");
 	}
+});
+
+// ── Composer chips (the hidden-control surface) ────────────────────────────
+// The chip row mounts in "conversation.input.dock", so the harness drives the
+// plugin's apply() with a stub context and captures whatever the slot registry
+// receives. React itself is stubbed down to the one hook the row uses.
+function loadComposerChips(storage) {
+	const registered = {};
+	const errors = [];
+	let plugin = null;
+	let removeRequests = 0;
+	function createElement(type, props) {
+		// React renders an array child as a list; flatten it so the assertions can
+		// index chips directly.
+		return { type, props: props || {}, children: Array.prototype.slice.call(arguments, 2).flat() };
+	}
+	function Component() {}
+	const React = {
+		Component,
+		createElement,
+		useSyncExternalStore(_subscribe, snapshot) { return snapshot(); },
+		useState(initial) { return [initial, function () {}]; },
+		useRef() { return { current: null }; },
+		useEffect() {},
+		useLayoutEffect() {}
+	};
+	const testWindow = {
+		__DSH_PROMPT_MANAGER_TEST_HOOK__() {},
+		__ModuleLoader__: {
+			load(specification) { plugin = specification.factory(() => React); }
+		},
+		localStorage: {
+			getItem(key) { return Object.prototype.hasOwnProperty.call(storage, key) ? storage[key] : null; },
+			setItem(key, value) { storage[key] = String(value); },
+			removeItem(key) { delete storage[key]; }
+		},
+		fetch(url) {
+			if (String(url).indexOf("/prompt-manager/remove") !== -1) removeRequests += 1;
+			return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ prompts: [], revision: 0 }) });
+		},
+		addEventListener() {},
+		removeEventListener() {},
+		setTimeout() { return 0; },
+		clearTimeout() {},
+		requestAnimationFrame() { return 0; },
+		cancelAnimationFrame() {}
+	};
+	const context = {
+		Blob,
+		URL,
+		Date,
+		Math,
+		Number,
+		Object,
+		Promise,
+		String,
+		console: { error(...args) { errors.push(args); }, warn() {}, log() {} },
+		setTimeout: testWindow.setTimeout,
+		clearTimeout: testWindow.clearTimeout,
+		window: testWindow
+	};
+	vm.runInNewContext(fs.readFileSync(new URL("../lib/client.js", import.meta.url), "utf8"), context);
+	assert.ok(plugin, "client module should expose the plugin");
+	plugin.apply({
+		locale: {
+			register: () => () => {},
+			bind: () => () => undefined,
+			getSnapshot: () => ({ active: "zh" }),
+			subscribe: () => () => {}
+		},
+		effect(fn) {
+			try { const cleanup = fn(); return typeof cleanup === "function" ? cleanup : () => {}; } catch (error) { return () => {}; }
+		},
+		inject(_names, fn) {
+			try { fn({ inputTriggers: { registerSource: () => () => {} } }); } catch (error) {}
+		},
+		slots: {
+			inject(_name, fn) { fn(); },
+			register(meta, component) { registered[meta.id] = component; return () => {}; }
+		}
+	});
+	return { registered, errors, removeRequests: () => removeRequests };
+}
+
+function chipStorage(showComposerControl) {
+	return {
+		"dsh-prompt-manager.display": JSON.stringify({ version: 1, showComposerControl }),
+		"dsh-prompt-manager.session-injections": JSON.stringify({
+			version: 2,
+			injections: [{
+				sessionId: "s1",
+				activatedAt: 1,
+				prompts: [
+					{ id: "p1", title: "代码审查", content: "review" },
+					{ id: "p2", title: "周报助手", content: "weekly" }
+				]
+			}]
+		}),
+		"dsh-prompt-manager.prompts": JSON.stringify({ version: 3, prompts: [] })
+	};
+}
+
+test("a hidden composer control shows the session's prompts as chips", () => {
+	const harness = loadComposerChips(chipStorage(false));
+	assert.deepEqual(harness.errors, []);
+	const ChipRow = harness.registered["prompt-manager-chips"];
+	assert.equal(typeof ChipRow, "function");
+
+	const tree = ChipRow({ sessionId: "s1" });
+	assert.equal(tree.props.className, "pm-chip-row");
+	assert.equal(tree.children.length, 2);
+
+	const chip = tree.children[0];
+	assert.equal(chip.props.className, "pm-chip");
+	assert.equal(chip.children.length, 3, "each chip holds an icon, a label, and a remove button");
+	assert.equal(chip.children[1].children[0], "代码审查");
+	assert.equal(tree.children[1].children[1].children[0], "周报助手");
+
+	const remove = chip.children[2];
+	assert.equal(remove.type, "button");
+	remove.props.onClick();
+	assert.equal(harness.removeRequests(), 1, "removing a chip cancels that prompt");
+});
+
+test("chips stay out of the way while the composer control is visible", () => {
+	const harness = loadComposerChips(chipStorage(true));
+	assert.deepEqual(harness.errors, []);
+	const ChipRow = harness.registered["prompt-manager-chips"];
+	assert.equal(ChipRow({ sessionId: "s1" }), null);
+});
+
+test("chips render nothing for a session without prompts", () => {
+	const storage = chipStorage(false);
+	storage["dsh-prompt-manager.session-injections"] = JSON.stringify({ version: 2, injections: [] });
+	const harness = loadComposerChips(storage);
+	const ChipRow = harness.registered["prompt-manager-chips"];
+	assert.equal(ChipRow({ sessionId: "s1" }), null);
 });
