@@ -215,6 +215,52 @@ test("startup reconciliation seeds only when browser and host libraries are both
 	assert.equal(intentionallyEmpty.dirty, true);
 });
 
+test("display preference reconciliation keeps the newer copy and adopts the host on a fresh origin", () => {
+	// Fresh origin (desktop restart on a new port): the host mirror wins so the
+	// switch survives the launch, and the value is written back to localStorage.
+	const adopted = core.reconcileDisplayStartup(
+		{ exists: false, showComposerControl: true, savedAt: 0 },
+		{ exists: true, corrupt: false, showComposerControl: false, savedAt: 20 }
+	);
+	assert.equal(adopted.showComposerControl, false);
+	assert.equal(adopted.writeLocal, true);
+	assert.equal(adopted.pushRemote, false);
+
+	// A newer browser-local toggle wins and refreshes the host copy.
+	const localNewer = core.reconcileDisplayStartup(
+		{ exists: true, showComposerControl: true, savedAt: 30 },
+		{ exists: true, corrupt: false, showComposerControl: false, savedAt: 20 }
+	);
+	assert.equal(localNewer.showComposerControl, true);
+	assert.equal(localNewer.writeLocal, false);
+	assert.equal(localNewer.pushRemote, true);
+
+	// Legacy localStorage documents carry no savedAt (0): the host copy wins.
+	const migrated = core.reconcileDisplayStartup(
+		{ exists: true, showComposerControl: true, savedAt: 0 },
+		{ exists: true, corrupt: false, showComposerControl: false, savedAt: 5 }
+	);
+	assert.equal(migrated.showComposerControl, false);
+	assert.equal(migrated.writeLocal, true);
+
+	// A corrupt host file never overrides the browser-local value.
+	const corrupt = core.reconcileDisplayStartup(
+		{ exists: true, showComposerControl: false, savedAt: 30 },
+		{ exists: true, corrupt: true, showComposerControl: true, savedAt: 40 }
+	);
+	assert.equal(corrupt.showComposerControl, false);
+	assert.equal(corrupt.pushRemote, false);
+
+	// Nothing stored anywhere: keep the default without writing.
+	const fresh = core.reconcileDisplayStartup(
+		{ exists: false, showComposerControl: true, savedAt: 0 },
+		{ exists: false, corrupt: false, showComposerControl: true, savedAt: 0 }
+	);
+	assert.equal(fresh.showComposerControl, true);
+	assert.equal(fresh.writeLocal, false);
+	assert.equal(fresh.pushRemote, false);
+});
+
 test("startup reconciliation keeps dirty local changes and rebases conflicts without dropping entries", () => {
 	const sameRevision = core.reconcileLibraryStartup(
 		{ exists: true, prompts: [{ id: "local", title: "Local", content: "New" }], error: "", revision: 3, dirty: true },

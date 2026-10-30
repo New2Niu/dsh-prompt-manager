@@ -69,10 +69,12 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1
 
 提示词默认保存在浏览器 `localStorage` 的 `dsh-prompt-manager.prompts` 键中，并镜像到本机
 `$DSH_HOME/dsh-prompt-manager/prompts.json`（可用环境变量 `DSH_PROMPT_MANAGER_DATA_DIR` 更改目录）；
-每个会话当前启用的提示词集合保存在 `dsh-prompt-manager.session-injections` 中。因此：
+每个会话当前启用的提示词集合保存在 `dsh-prompt-manager.session-injections` 中；设置页
+「在输入框显示提示词按钮」的开关保存在 `dsh-prompt-manager.display` 键中，并镜像到同目录的
+`display.json`。因此：
 
 - 同一浏览器的多个标签页会同步；
-- DSH 桌面应用每次启动可能使用新端口（浏览器 `localStorage` 按端口隔离），此时提示词库会从本机镜像文件自动恢复，不再因重启而丢失；
+- DSH 桌面应用每次启动可能使用新端口（浏览器 `localStorage` 按端口隔离），此时提示词库会从本机镜像文件自动恢复，提示词的显示开关与按钮显隐偏好也会一并恢复，不再因重启而丢失；
 - 换浏览器或清理站点数据前，建议先点“导出”；
 - 导入“合并”会保留现有条目，同 ID 的备份条目会覆盖旧条目；
 - 导入“替换”会用备份完整替换当前提示词库。

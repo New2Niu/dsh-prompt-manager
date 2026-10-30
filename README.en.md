@@ -67,10 +67,10 @@ Use `Ctrl + Enter` (`⌘ + Enter` on macOS) to save while editing.
 
 ## Backups and privacy
 
-Prompts are stored in browser `localStorage` under `dsh-prompt-manager.prompts`, and mirrored to `$DSH_HOME/dsh-prompt-manager/prompts.json` (relocatable with the `DSH_PROMPT_MANAGER_DATA_DIR` environment variable). Active per-session prompt sets are stored under `dsh-prompt-manager.session-injections`. That means:
+Prompts are stored in browser `localStorage` under `dsh-prompt-manager.prompts`, and mirrored to `$DSH_HOME/dsh-prompt-manager/prompts.json` (relocatable with the `DSH_PROMPT_MANAGER_DATA_DIR` environment variable). Active per-session prompt sets are stored under `dsh-prompt-manager.session-injections`; the "show the Prompts control" preference lives under `dsh-prompt-manager.display` and is mirrored to `display.json` in the same directory. That means:
 
 - tabs in the same browser stay in sync;
-- DSH Desktop may serve the Web UI on a new port each launch (browser `localStorage` is isolated per port), so the library is restored from the local mirror file and no longer reset by a restart;
+- DSH Desktop may serve the Web UI on a new port each launch (browser `localStorage` is isolated per port), so the library is restored from the local mirror file — including the per-prompt visibility switches and the control preference — and no longer reset by a restart;
 - exporting is recommended before clearing site data or changing browsers;
 - **Merge** keeps local entries and lets matching IDs from the backup win;
 - **Replace** replaces the whole library with the backup.

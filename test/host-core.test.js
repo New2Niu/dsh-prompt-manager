@@ -207,6 +207,18 @@ test("library normalization keeps tags, favorites, and usage while deduplicating
 	assert.deepEqual(prompts[2].tags, []);
 });
 
+test("library normalization preserves the per-prompt hidden switch", () => {
+	const prompts = normalizeLibraryPrompts([
+		{ id: "shown", title: "Shown", content: "Keep visible" },
+		{ id: "hidden", title: "Hidden", content: "Keep hidden", hidden: true },
+		{ id: "lie", title: "Lie", content: "Not a boolean", hidden: "yes" }
+	]);
+	assert.equal(prompts.length, 3);
+	assert.equal(prompts[0].hidden, false);
+	assert.equal(prompts[1].hidden, true);
+	assert.equal(prompts[2].hidden, false);
+});
+
 test("library route preserves an intentionally empty library with revisions and private files", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "dsh-prompt-manager-"));
 	const previous = process.env.DSH_PROMPT_MANAGER_DATA_DIR;
@@ -282,6 +294,79 @@ test("library route preserves an intentionally empty library with revisions and 
 		if (process.platform !== "win32") {
 			assert.equal((await stat(directory)).mode & 0o777, 0o700);
 			assert.equal((await stat(join(directory, "prompts.json"))).mode & 0o777, 0o600);
+		}
+	} finally {
+		if (previous === undefined) delete process.env.DSH_PROMPT_MANAGER_DATA_DIR;
+		else process.env.DSH_PROMPT_MANAGER_DATA_DIR = previous;
+		await rm(directory, { recursive: true, force: true });
+	}
+});
+
+test("hidden switches and display preferences survive the durable file round trip", async () => {
+	const directory = await mkdtemp(join(tmpdir(), "dsh-prompt-manager-state-"));
+	const previous = process.env.DSH_PROMPT_MANAGER_DATA_DIR;
+	process.env.DSH_PROMPT_MANAGER_DATA_DIR = directory;
+	try {
+		let route;
+		const ctx = {
+			sessions: new Map(),
+			emit() {},
+			effect(setup) { return setup(); },
+			systemPrompt: { section() { return () => {}; } },
+			webServer: { register(options) { route = options.handler; return () => {}; } }
+		};
+		apply(ctx);
+
+		async function request(path, body) {
+			const req = Readable.from(body === undefined ? [] : [JSON.stringify(body)]);
+			Object.assign(req, {
+				method: body === undefined ? "GET" : "POST",
+				url: path,
+				socket: { remoteAddress: "127.0.0.1" },
+				headers: { "content-type": "application/json", host: "127.0.0.1:3080" }
+			});
+			let status = 0;
+			let responseBody = "";
+			const res = {
+				writableEnded: false,
+				writeHead(value) { status = value; },
+				end(value = "") { responseBody += value; this.writableEnded = true; }
+			};
+			await route(req, res);
+			return { status, body: responseBody ? JSON.parse(responseBody) : null };
+		}
+
+		const missing = await request("/prompt-manager/display");
+		assert.equal(missing.status, 200);
+		assert.equal(missing.body.exists, false);
+		assert.equal(missing.body.showComposerControl, true);
+
+		const saved = await request("/prompt-manager/display", { showComposerControl: false });
+		assert.equal(saved.status, 200);
+		assert.equal(saved.body.showComposerControl, false);
+
+		const hidden = await request("/prompt-manager/library", {
+			baseRevision: 0,
+			prompts: [
+				{ id: "one", title: "Review", content: "Check it" },
+				{ id: "two", title: "Tests", content: "Add tests", hidden: true }
+			]
+		});
+		assert.equal(hidden.status, 200);
+
+		const restored = await request("/prompt-manager/library");
+		assert.equal(restored.status, 200);
+		assert.deepEqual(restored.body.prompts.map((prompt) => prompt.hidden), [false, true]);
+
+		const preference = await request("/prompt-manager/display");
+		assert.equal(preference.body.exists, true);
+		assert.equal(preference.body.showComposerControl, false);
+
+		const stored = JSON.parse(await readFile(join(directory, "display.json"), "utf8"));
+		assert.equal(stored.showComposerControl, false);
+		assert.deepEqual(await readdir(directory).then((names) => names.sort()), ["display.json", "prompts.json"]);
+		if (process.platform !== "win32") {
+			assert.equal((await stat(join(directory, "display.json"))).mode & 0o777, 0o600);
 		}
 	} finally {
 		if (previous === undefined) delete process.env.DSH_PROMPT_MANAGER_DATA_DIR;
