@@ -57,6 +57,12 @@ test("settings navigation label matching ignores surrounding whitespace", () => 
 	assert.equal(core.settingsNavLabelMatches(null, "提示词管理"), false);
 });
 
+test("settings navigation stops marking the row once the icon slot renders", () => {
+	assert.equal(core.settingsNavUsesSlotIcon({ querySelector: () => ({}) }), true);
+	assert.equal(core.settingsNavUsesSlotIcon({ querySelector: () => null }), false);
+	assert.equal(core.settingsNavUsesSlotIcon(null), false);
+});
+
 test("Chinese and English dictionaries stay in sync", () => {
   assert.deepEqual(Object.keys(core.messages.zh).sort(), Object.keys(core.messages.en).sort());
 });
